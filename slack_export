@@ -1,0 +1,148 @@
+#instalar pacotes necessários para o procedimento de exportação do histórico de conversas do slack
+install.packages("rjson")
+install.packages("dplyr")
+install.packages("rmarkdown")
+install.packages("pagedown")
+library(rjson) #import and manipulate JSON files
+library(dplyr) #data handling / pipe char
+library(rmarkdown)
+library(pagedown)
+
+
+#Descompacte o arquivo de exportação do Slack
+#Colocar a pasta descompactada exportada no slack no diretório do R C:\Users\Usuário\Documents
+#getwd() <- "C:/Users/Usuário/Documents"
+#Copiar o nome da pasta descompactada, e mudar o nome da variável exportname 
+#exportname <- "exportunzipped"
+exportname <- "projeto_alpha_slack_chats"
+working_directory <- getwd() %>% as.character()
+slackexport_folder_path <- paste0(working_directory,"/",exportname)
+
+#Faça uma lista de todos os canais presentes no slack export
+#Essas informações estão todas no arquivo "<path>/exportname/channels.json".
+channels_path <- paste0(slackexport_folder_path,"/channels.json")
+channels_json <- fromJSON(file = channels_path)
+channel_list <- setNames(data.frame(matrix(ncol = 2, nrow = 0)), 
+                         c("ch_id", "name"))
+
+for (channel in 1:length(channels_json)) { 
+  #Crie um df (channel_list) com informações sobre cada canal, a partir do arquivo JSON
+  channel_list[channel, "ch_id"] <- channels_json[[channel]]$id
+  channel_list[channel, "name"] <- channels_json[[channel]]$name
+  #Para cada canal, faça uma lista de todos os arquivos JSON individuais (um arquivo por dia de atividade)
+  #Adicione essa lista ao objeto channels_json como uma lista em cada canal: channels_json[[channel]]$dayslist
+  channel_folder_path <- ""
+  channels_json[[channel]]$dayslist <- ""
+  channel_folder_path <- paste0(slackexport_folder_path,"/",channel_list[channel,"name"])
+  channels_json[[channel]]$dayslist <- list.files(channel_folder_path, 
+                                                  pattern=NULL, all.files=FALSE, full.names=FALSE)
+}
+
+# Função para converter um único arquivo JSON em um dataframe com campos específicos extraídos
+slack_json_to_dataframe <- function(slack_json) {
+  # Inicializa o dataframe com as colunas esperadas
+  messages_df <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), 
+                          c("ts", "user", "text"))
+  
+  # Itera sobre cada mensagem no arquivo JSON
+  for (message in 1:length(slack_json)) {
+    # Atribui os valores, substituindo `NULL` por `NA` para evitar erros
+    ts <- if (!is.null(slack_json[[message]]$ts)) slack_json[[message]]$ts else NA
+    user <- if (!is.null(slack_json[[message]]$user)) slack_json[[message]]$user else NA
+    text <- if (!is.null(slack_json[[message]]$text)) slack_json[[message]]$text else NA
+    
+    # Adiciona a mensagem ao dataframe
+    messages_df <- rbind(messages_df, data.frame(
+      ts = ts, 
+      user = user, 
+      text = text, 
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  return(messages_df)
+}
+
+# Inicializa uma lista para armazenar o texto de todos os canais
+all_channels_text <- list()
+
+for (channel in 1:length(channels_json)) {
+  # Inicializa um vetor para armazenar o texto de todas as mensagens em um único canal
+  all_channel_text <- c()
+  
+  if (length(channels_json[[channel]]$dayslist) > 0) {
+    for (file_day in 1:length(channels_json[[channel]]$dayslist)) {
+      parentfolder_path <- paste0(slackexport_folder_path,"/",channels_json[[channel]]$name)
+      filejson_path <- paste0(parentfolder_path, "/", channels_json[[channel]]$dayslist[[file_day]])
+      import_file_json <- fromJSON(file = filejson_path)
+      
+      import_file_df <- slack_json_to_dataframe(import_file_json)
+      
+      # Adiciona o texto ao vetor `all_channel_text`
+      all_channel_text <- c(all_channel_text, import_file_df$text)
+    }
+    
+    # Adiciona o texto do canal à lista `all_channels_text`
+    all_channels_text[[channels_json[[channel]]$name]] <- paste(all_channel_text, collapse = "\n")
+  } else {
+    warning(paste("O canal", channels_json[[channel]]$name, "não tem arquivos JSON associados."))
+  }
+}
+
+# Loop para processar cada canal
+for (channel_name in names(all_channels_text)) {
+  # Conteúdo do canal
+  pdf_content <- paste0("Canal: ", channel_name, "\n\n", all_channels_text[[channel_name]], "\n\n\n")
+  
+  # Define o nome do arquivo HTML temporário e o nome do PDF final
+  html_filename <- paste0(exportname, "_", channel_name, ".html")
+  pdf_filename <- paste0(exportname, "_", channel_name, ".pdf")
+  
+  # Escreve o conteúdo em um arquivo HTML temporário
+  cat(pdf_content, file = "temp_text.Rmd")
+  
+  # Renderiza o arquivo RMarkdown para HTML
+  rmarkdown::render("temp_text.Rmd", output_format = "html_document", output_file = html_filename)
+  
+  # Converte o HTML para PDF usando pagedown
+  pagedown::chrome_print(html_filename, output = pdf_filename)
+  
+  # Remove os arquivos temporários
+  file.remove("temp_text.Rmd")
+  file.remove(html_filename)
+}
+
+
+# Inicializa um dataframe para armazenar o nome do canal e as mensagens de todos os canais
+all_channels_df <- setNames(data.frame(matrix(ncol = 2, nrow = 0)), 
+                            c("channel_name", "text"))
+
+# Loop para processar cada canal e armazenar as mensagens no dataframe
+for (channel in 1:length(channels_json)) {
+  if (length(channels_json[[channel]]$dayslist) > 0) {
+    for (file_day in 1:length(channels_json[[channel]]$dayslist)) {
+      parentfolder_path <- paste0(slackexport_folder_path,"/",channels_json[[channel]]$name)
+      filejson_path <- paste0(parentfolder_path, "/", channels_json[[channel]]$dayslist[[file_day]])
+      import_file_json <- fromJSON(file = filejson_path)
+      
+      import_file_df <- slack_json_to_dataframe(import_file_json)
+      
+      # Adiciona o nome do canal e as mensagens ao dataframe `all_channels_df`
+      for (message in 1:nrow(import_file_df)) {
+        all_channels_df <- rbind(all_channels_df, data.frame(
+          channel_name = channels_json[[channel]]$name, 
+          text = import_file_df$text[message],
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+  } else {
+    warning(paste("O canal", channels_json[[channel]]$name, "não tem arquivos JSON associados."))
+  }
+}
+
+# Exporta o dataframe para um arquivo CSV
+csv_filename <- paste0(exportname, "_all_channels.csv")
+write.csv(all_channels_df, file = csv_filename, row.names = FALSE)
+
+message("Arquivo CSV exportado com sucesso: ", csv_filename)
