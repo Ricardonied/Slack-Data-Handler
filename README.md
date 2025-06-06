@@ -81,7 +81,7 @@ Ensure the following packages are installed:
 install.packages(c(
   "rjson", "dplyr", "rmarkdown", "pagedown", "tidytext", "tm",
   "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
-  "textstem", "wordcloud"
+  "textstem", "wordcloud", "pdftools", "broom", "RColorBrewer"
 ))
 
 ```
