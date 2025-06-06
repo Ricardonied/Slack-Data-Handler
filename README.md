@@ -1,12 +1,12 @@
 # 📚 Slack Conversation Analysis Toolkit
 
-This repository contains three R scripts designed to assist in the extraction, structuring, and analysis of Slack workspace exports. Together, these tools enable both human-readable reporting and advanced text mining of Slack conversations.
+This repository contains three main R scripts designed to assist in the extraction, structuring, and analysis of Slack workspace exports. Together, these tools enable both human-readable reporting and advanced text mining of Slack conversations.
 
 ---
 
 ## 📁 Overview of Scripts
 
-### 1. `slack_export`
+### 1. `slack_export.R`
 
 **Purpose**:  
 Generates formatted **PDF files** for each Slack channel and a consolidated **CSV file** with all messages for archival or reading.
@@ -24,27 +24,22 @@ Generates formatted **PDF files** for each Slack channel and a consolidated **CS
 
 ---
 
-### 2. `slack_export_detailed_analysis`
+### 2. `slack_export_combined.R`
 
-**Purpose**:  
-Processes the Slack export with a **richer metadata structure**, suitable for research and analysis of communication patterns.
+**Purpose**:
+Single entry point that replicates `slack_export.R` and, when run with the `--detailed` flag, also produces rich metadata tables.
 
 **Main Features**:
-- Extracts detailed fields from message data (threads, reply counts, types).
-- Includes metadata for:
-  - Messages
-  - Users (`users.json`)
-  - Channels (`channels.json`)
-- Exports structured data for further processing or machine learning.
+- Generates channel PDFs and a basic CSV of messages.
+- Optional `--detailed` mode adds message threads, user and channel metadata.
 
 **Output**:
-- `projectname_<startdate>_to_<enddate>.csv`: full message log
-- `projectname_users.csv`: user metadata
-- `projectname_channels.csv`: channel structure and properties
+- Basic mode: `projectname_all_channels.csv` plus one PDF per channel.
+- Detailed mode: `projectname_<startdate>_to_<enddate>.csv` with message metadata, `projectname_users.csv`, and `projectname_channels.csv`.
 
 ---
 
-### 3. `slack_topic_modelling`
+### 3. `slack_topic_modelling.R`
 
 **Purpose**:  
 Performs **natural language processing (NLP)** and **topic modeling** on the text extracted from Slack PDFs, enabling insight into the main topics and vocabulary trends.
@@ -79,7 +74,7 @@ Ensure the following packages are installed:
 
 ```r
 install.packages(c(
-  "rjson", "dplyr", "rmarkdown", "pagedown", "tidytext", "tm",
+  "optparse", "rjson", "dplyr", "rmarkdown", "pagedown", "tidytext", "tm",
   "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
   "textstem", "wordcloud", "pdftools", "broom", "RColorBrewer"
 ))
