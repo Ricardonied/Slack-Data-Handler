@@ -1,26 +1,25 @@
-# Slack Export Processing Toolkit
+# 📚 Slack Conversation Analysis Toolkit
 
-This repository contains two R scripts designed to help process and analyze Slack workspace exports. These tools automate the transformation of raw Slack JSON exports into structured outputs, including PDFs and CSVs, suitable for archiving, reporting, or data analysis.
+This repository contains three R scripts designed to assist in the extraction, structuring, and analysis of Slack workspace exports. Together, these tools enable both human-readable reporting and advanced text mining of Slack conversations.
 
 ---
 
-## 📁 Scripts Overview
+## 📁 Overview of Scripts
 
 ### 1. `slack_export_to_pdf_and_csv.R`
 
 **Purpose**:  
-Generates a PDF file for each channel with the full conversation history, and exports a consolidated CSV with all message texts from the Slack export.
+Generates formatted **PDF files** for each Slack channel and a consolidated **CSV file** with all messages for archival or reading.
 
 **Main Features**:
-- Reads all exported channel and message files.
-- Extracts messages (`ts`, `user`, `text`) from each day per channel.
-- Combines all messages into a single text block per channel.
-- Generates:
-  - One PDF per channel with formatted conversation logs.
-  - A single CSV file with all messages across all channels.
+- Parses Slack export JSON files.
+- Extracts message text from each channel and day.
+- Produces:
+  - One PDF per channel with formatted content.
+  - One CSV with raw messages across all channels.
 
-**Output Files**:
-- `projectname_channelname.pdf` (one per channel)
+**Output**:
+- `projectname_channelname.pdf`
 - `projectname_all_channels.csv`
 
 ---
@@ -28,29 +27,59 @@ Generates a PDF file for each channel with the full conversation history, and ex
 ### 2. `slack_export_detailed_analysis.R`
 
 **Purpose**:  
-Creates detailed CSV files for messages, users, and channel metadata, enabling advanced analysis (e.g., text mining, communication patterns, or thread tracking).
+Processes the Slack export with a **richer metadata structure**, suitable for research and analysis of communication patterns.
 
 **Main Features**:
-- Extracts message-level metadata such as:
-  - `msg_id`, `ts`, `user`, `type`, `text`, `thread_ts`, replies
-- Builds structured datasets:
-  - All messages across all channels
-  - User metadata (from `users.json`)
-  - Channel metadata (from `channels.json`)
+- Extracts detailed fields from message data (threads, reply counts, types).
+- Includes metadata for:
+  - Messages
+  - Users (`users.json`)
+  - Channels (`channels.json`)
+- Exports structured data for further processing or machine learning.
 
-**Output Files**:
-- `projectname_startdate_to_enddate.csv`: messages with full metadata
-- `projectname_users.csv`: user information
+**Output**:
+- `projectname_<startdate>_to_<enddate>.csv`: full message log
+- `projectname_users.csv`: user metadata
 - `projectname_channels.csv`: channel structure and properties
 
 ---
 
-## 📦 Required Packages
+### 3. `text_mining_topic_modeling_slack.R`
 
-Both scripts rely on the following R packages:
+**Purpose**:  
+Performs **natural language processing (NLP)** and **topic modeling** on the text extracted from Slack PDFs, enabling insight into the main topics and vocabulary trends.
+
+**Main Features**:
+- Reads all PDFs (generated in the first script).
+- Cleans and tokenizes text.
+- Removes stopwords (standard and custom).
+- Performs **lemmatization** (word normalization).
+- Generates:
+  - Most frequent words
+  - Word clouds
+  - Topic modeling using Structural Topic Models (STM)
+  - Document-topic probabilities
+
+**Visual Output**:
+- Word frequency bar charts
+- Word clouds
+- Topic-term distribution plots
+- Document-topic assignment visualization
+
+**Use Cases**:
+- Thematic exploration of Slack conversations.
+- Supporting qualitative research and communication analysis.
+- Identifying trends, concerns, or dominant topics in teams.
+
+---
+
+## 🔧 Required R Packages
+
+Ensure the following packages are installed:
 
 ```r
-install.packages("rjson")
-install.packages("dplyr")
-install.packages("rmarkdown")     # (for PDF generation script only)
-install.packages("pagedown")      # (for PDF generation script only)
+install.packages(c(
+  "rjson", "dplyr", "rmarkdown", "pagedown", "tidytext", "tm",
+  "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
+  "textstem", "wordcloud"
+))
