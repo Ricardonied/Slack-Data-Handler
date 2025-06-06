@@ -9,7 +9,7 @@ library(dplyr) #data handling / pipe char
 #getwd() <- "C:/Users/Usuário/Documents"
 #Copiar o nome da pasta descompactada, e mudar o nome da variável exportname 
 #exportname <- "exportunzipped"
-exportname <- "Intelbras-WiseFi Slack export Jul 1 2023 - Sep 30 2023"
+exportname <- "Slack export Jul 1 2023 - Sep 30 2023"
 working_directory <- getwd() %>% as.character()
 slackexport_folder_path <- paste0(working_directory,"/",exportname)
 
