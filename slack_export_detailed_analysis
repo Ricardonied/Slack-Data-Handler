@@ -7,14 +7,19 @@ library(dplyr) #data handling / pipe char
 #Descompacte o arquivo de exportação do Slack
 #Colocar a pasta descompactada exportada no slack no diretório do R C:\Users\Usuário\Documents
 #getwd() <- "C:/Users/Usuário/Documents"
-#Copiar o nome da pasta descompactada, e mudar o nome da variável exportname 
-#exportname <- "exportunzipped"
-exportname <- "Slack export Jul 1 2023 - Sep 30 2023"
+# Copiar o nome da pasta descompactada ou passá-lo via argumento
+# Se nada for especificado, usa-se um placeholder padrao.
+args <- commandArgs(trailingOnly = TRUE)
+if (interactive()) {
+  export_name <- if (length(args) >= 1) args[1] else readline("Enter Slack export folder name: ")
+} else {
+  export_name <- if (length(args) >= 1) args[1] else "my_export_folder"
+}
 working_directory <- getwd() %>% as.character()
-slackexport_folder_path <- paste0(working_directory,"/",exportname)
+slackexport_folder_path <- paste0(working_directory, "/", export_name)
 
 #Faça uma lista de todos os canais presentes no slack export
-#Essas informações estão todas no arquivo "<path>/exportname/channels.json".
+#Essas informações estão todas no arquivo "<path>/export_name/channels.json".
 channels_path <- paste0(slackexport_folder_path,"/channels.json")
 channels_json <- fromJSON(file = channels_path)
 channel_list <- setNames(data.frame(matrix(ncol = 9, nrow = 0)), 
@@ -144,8 +149,8 @@ for (channel in 1:length(channels_json)) {
 #format: exportfoldername_mindate_to_maxdate.csv
 filename_mindate <- min(all_channels_all_files_df$ts) %>% as.numeric() %>% as.Date.POSIXct()
 filename_maxdate <- max(all_channels_all_files_df$ts) %>% as.numeric() %>% as.Date.POSIXct()
-#Note exportfoldername was defined earlier before pulling in any of the files: exportname
-slack_export_df_filename <- paste0(exportname,"_",filename_mindate,"_to_",filename_maxdate,".csv")
+#Note exportfoldername was defined earlier before pulling in any of the files: export_name
+slack_export_df_filename <- paste0(export_name,"_",filename_mindate,"_to_",filename_maxdate,".csv")
 write.csv(all_channels_all_files_df, file = slack_export_df_filename)
 
 #TODO - how does it handle orphaned threads? or deleted children? 
@@ -182,12 +187,12 @@ for (user in 1:length(users_json)) {
   
 }
 #write user data to a csv to be read back in as df, as needed.
-slack_export_user_filename <- paste0(exportname,"_users.csv")
+slack_export_user_filename <- paste0(export_name,"_users.csv")
 write.csv(user_list_df, file = slack_export_user_filename)
 
 
 #Write a csv for channel metadata
 #write user data to a csv to be read back in as df, as needed.
-slack_export_channel_filename <- paste0(exportname,"_channels.csv")
+slack_export_channel_filename <- paste0(export_name,"_channels.csv")
 write.csv(channel_list, file = slack_export_channel_filename)
 
