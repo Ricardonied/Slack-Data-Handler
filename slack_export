@@ -12,14 +12,20 @@ library(pagedown)
 #Descompacte o arquivo de exportação do Slack
 #Colocar a pasta descompactada exportada no slack no diretório do R C:\Users\Usuário\Documents
 #getwd() <- "C:/Users/Usuário/Documents"
-#Copiar o nome da pasta descompactada, e mudar o nome da variável exportname 
-#exportname <- "exportunzipped"
-exportname <- "projeto_alpha_slack_chats"
+# Copiar o nome da pasta descompactada ou passá-lo via argumento
+# Se o script for executado em modo interativo e nenhum argumento for
+# fornecido, será solicitado ao usuário que informe o nome da pasta.
+args <- commandArgs(trailingOnly = TRUE)
+if (interactive()) {
+  export_name <- if (length(args) >= 1) args[1] else readline("Enter Slack export folder name: ")
+} else {
+  export_name <- if (length(args) >= 1) args[1] else "my_export_folder"
+}
 working_directory <- getwd() %>% as.character()
-slackexport_folder_path <- paste0(working_directory,"/",exportname)
+slackexport_folder_path <- paste0(working_directory, "/", export_name)
 
 #Faça uma lista de todos os canais presentes no slack export
-#Essas informações estão todas no arquivo "<path>/exportname/channels.json".
+#Essas informações estão todas no arquivo "<path>/export_name/channels.json".
 channels_path <- paste0(slackexport_folder_path,"/channels.json")
 channels_json <- fromJSON(file = channels_path)
 channel_list <- setNames(data.frame(matrix(ncol = 2, nrow = 0)), 
@@ -95,8 +101,8 @@ for (channel_name in names(all_channels_text)) {
   pdf_content <- paste0("Canal: ", channel_name, "\n\n", all_channels_text[[channel_name]], "\n\n\n")
   
   # Define o nome do arquivo HTML temporário e o nome do PDF final
-  html_filename <- paste0(exportname, "_", channel_name, ".html")
-  pdf_filename <- paste0(exportname, "_", channel_name, ".pdf")
+  html_filename <- paste0(export_name, "_", channel_name, ".html")
+  pdf_filename <- paste0(export_name, "_", channel_name, ".pdf")
   
   # Escreve o conteúdo em um arquivo HTML temporário
   cat(pdf_content, file = "temp_text.Rmd")
@@ -142,7 +148,7 @@ for (channel in 1:length(channels_json)) {
 }
 
 # Exporta o dataframe para um arquivo CSV
-csv_filename <- paste0(exportname, "_all_channels.csv")
+csv_filename <- paste0(export_name, "_all_channels.csv")
 write.csv(all_channels_df, file = csv_filename, row.names = FALSE)
 
 message("Arquivo CSV exportado com sucesso: ", csv_filename)
