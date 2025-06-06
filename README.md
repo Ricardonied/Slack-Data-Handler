@@ -83,3 +83,7 @@ install.packages(c(
   "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
   "textstem", "wordcloud"
 ))
+```
+
+These libraries support data extraction, text processing, and visualization.
+Ensure they are installed before running any of the analysis scripts.
