@@ -1,0 +1,231 @@
+# Instalando e carregando bibliotecas
+install.packages(c("dplyr", "tidytext", "tm", "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2"))
+library(dplyr)
+library(tidytext)
+library(tm)
+library(tidymodels)
+library(stm)
+library(reshape2)
+library(forcats)
+library(knitr)
+library(ggplot2)
+
+# Definindo diretório e obtendo lista de arquivos PDF
+diretorio <- "C:/Users/Usuário/Documents/projeto_pdfs"
+arquivos_pdf <- list.files(diretorio, pattern = ".pdf$", full.names = T)
+
+# Extraindo o texto dos PDFs
+texto_pdf <- lapply(arquivos_pdf, pdf_text)
+
+#Montando a base de dados
+
+#Variável 1: id
+num_canais <- length(arquivos_pdf)
+id <- paste0 ("art", 1:num_canais)
+
+#Variável 2: nomecanal
+nomecanal <- tools::file_path_sans_ext(basename(arquivos_pdf))
+
+
+#Juntando em um dataframe
+#Cada item da lista é um var do tipo chr com tamanhos distintos. cbind ou dataframe n funciona
+
+#Criando dataframe vazio
+dados_canal <- data.frame(id = character(length(texto_pdf)), nomecanal = character(length(texto_pdf)), texto = character(length(texto_pdf)), stringsAsFactors = FALSE)
+
+#Criando um laço para associar cada artigo com sua id e nomecanal
+for (i in 1:length(texto_pdf)) {
+  dados_canal[i, "id"] <- id[i]
+  dados_canal[i, "nomecanal"] <- nomecanal[i]
+  dados_canal[i, "texto"] <- paste(texto_pdf[[i]], collapse = " ")
+}
+
+# Carregar o arquivo de stopwords personalizadas
+caminho_arquivo <- "C:/Users/Usuário/Desktop/stopwords_personalizadas.txt" 
+stopwords_personalizadas <- readLines(caminho_arquivo)
+
+# Converter para um tibble
+stopwords_personalizadas <- tibble(word = stopwords_personalizadas)
+
+stopwords_personalizadas <- stopwords_personalizadas %>%
+  mutate(word = tolower(word)) %>%
+  mutate(word = gsub("[[:punct:]]", "", word)) %>%
+  mutate(word = gsub("[[:digit:]]", "", word)) %>%
+  mutate(word = gsub("[^[:alnum:]\\s]", "", word))
+
+### Tokenização, stopwords e palavras escolhidas como stopwords
+tidy_df <- dados_canal %>%
+  unnest_tokens(word, texto) %>%
+  anti_join(get_stopwords()) %>%
+  anti_join(stopwords_personalizadas) 
+tidy_df %>%
+  count(word, sort = T)
+
+# Limpeza geral
+tidy_df <- tidy_df %>%
+  mutate(word = gsub("[[:punct:]]", "", word)) %>%
+  mutate(word = tolower(word)) %>%
+  mutate(word = gsub("[[:digit:]]", "", word)) %>%
+  mutate(word = gsub("[^[:alnum:]\\s]", "", word)) %>%
+  filter(nchar(word) >= 3)
+
+# Reaplicar a remoção de stopwords após as transformações
+tidy_df <- tidy_df %>%
+  anti_join(get_stopwords(), by = "word") %>%
+  anti_join(stopwords_personalizadas, by = "word")
+
+# Remoção de pontuações
+# Remoção de maiusculas para evitar duplicações
+# Remover números
+# Remover caracteres especiais
+# Remover palavras pequenas (quando for possível)
+
+# Lematização - redução de palavras a sua forma básica com textstem
+install.packages("textstem")
+library(textstem)
+tidy_dfl <- tidy_df  %>%
+  mutate(word = textstem::lemmatize_words(word, language = "en"))
+
+tidy_dfl %>%
+  count(word, sort = T)
+
+## Análise descritiva em formato tidytext
+library(dplyr)
+library(tidytext)
+
+df <- tidy_dfl
+
+contagem_palavras <- df %>%
+  count(word, sort=T)
+
+library(ggplot2)
+
+#wordcloud
+grafico_palavras <- contagem_palavras %>%
+  top_n(25) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat = "identity", fill = "blue") +  # Mude a cor das barras para azul
+  labs(x = "Palavras", y = "Contagem") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text = element_text(size = 12))
+grafico_palavras
+
+# Verificar a coluna de identificação dos textos
+df %>% distinct(nomecanal)
+
+## Topic modeling
+library(tm)
+library (tidytext)
+library(tidymodels)
+
+# Criando a matriz
+spars_tidy_dfl <- tidy_dfl %>%
+  count(nomecanal, word) %>%
+  cast_sparse(nomecanal, word, n)
+
+spars_tidy_dfl
+
+# Train a model
+library(stm)
+# Para pequenas bases como essa, vamos usar k = 5
+topic_model <- stm(spars_tidy_dfl, K = 5)
+
+#Verificando o sumário
+summary(topic_model)
+
+score_words <- labelTopics(topic_model, n=15, topics = 1:5)
+
+score_words
+
+# Probabilidade de ocorrência por tópico
+install.packages("reshape2")
+library(reshape2)
+install.packages("broom")
+library(broom)
+library(tidytext)
+
+canais_topic <- tidy(topic_model, matrix = "beta")
+
+install.packages("forcats")
+library(forcats)
+install.packages("knitr")
+library(knitr)
+library(dplyr)
+
+canais_topic <- canais_topic %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  mutate(term = forcats::fct_reorder(term, beta), topic = paste("Topic", topic))
+print(canais_topic, n = 50)
+knitr::kable(canais_topic)
+
+library(ggplot2)
+canais_topic <- tidy(topic_model, matrix = "beta")
+canais_topic %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  mutate(term = forcats::fct_reorder(term, beta), topic = paste("Topic", topic)) %>%
+  ggplot(aes(beta, term, fill = topic))+
+  geom_col(show.legend = F)+
+  facet_wrap(vars(topic), scales = "free_y")+
+  labs(x = expression(beta), y = NULL)
+
+
+#Agora com as probabilidades ordenadas
+
+canais_topic <- tidy(topic_model, matrix = "beta")
+canais_topic %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  mutate(topic = paste ("Topic", topic)) %>%
+  ggplot(aes(beta, reorder_within(term, beta, topic), fill = topic))+
+  geom_col(show.legend = F)+
+  facet_wrap(vars(topic), scales = "free_y")+
+  scale_y_reordered()+
+  labs(x = expression(beta), y = NULL)
+
+# Probabilidade por documento
+doc_topic <- tidy(topic_model, matrix = "gamma",document_names = rownames(spars_tidy_dfl))
+print(doc_topic, n = 215)
+
+# Identificando um tópico para cada documento
+doc_gg <- doc_topic %>%
+  mutate(document = forcats::fct_reorder(document, gamma), topic = factor(topic)) %>%
+  ggplot(aes(gamma, topic, fill = topic))+
+  geom_col(show.legend = F)+
+  facet_wrap(vars(document))+
+  theme(strip.text = element_text(size = 7))+
+  labs(x = expression(gamma), y = "Topic")
+
+ggsave("C:/Users/Usuário/Desktop/gamma_tinst_p.png", doc_gg, width = 11, height = 8.5, dpi = 300)
+
+# Visualizar em tabela ao invés do gráfico
+doc_topic_t <- doc_topic %>%
+  pivot_wider(names_from = topic, values_from = gamma, values_fill = 0)
+doc_topic_t
+
+
+#outros gráficos
+
+# Visualizar as 10 palavras mais frequentes
+contagem_palavras <- tidy_dfl %>%
+  count(word, sort = TRUE)
+
+head(contagem_palavras, 10)
+
+#Gráfico: Um gráfico de barras das palavras mais frequentes.
+ggplot(contagem_palavras %>% top_n(25), aes(x = reorder(word, n), y = n)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(x = "Palavras", y = "Frequência") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Nuvem de Palavras
+install.packages("wordcloud")
+library(wordcloud)
+wordcloud(words = contagem_palavras$word, freq = contagem_palavras$n, min.freq = 2, 
+          random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+
