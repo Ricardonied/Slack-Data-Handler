@@ -6,7 +6,7 @@ This repository contains three R scripts designed to assist in the extraction, s
 
 ## 📁 Overview of Scripts
 
-### 1. `slack_export_to_pdf_and_csv.R`
+### 1. `slack_export`
 
 **Purpose**:  
 Generates formatted **PDF files** for each Slack channel and a consolidated **CSV file** with all messages for archival or reading.
@@ -24,7 +24,7 @@ Generates formatted **PDF files** for each Slack channel and a consolidated **CS
 
 ---
 
-### 2. `slack_export_detailed_analysis.R`
+### 2. `slack_export_detailed_analysis`
 
 **Purpose**:  
 Processes the Slack export with a **richer metadata structure**, suitable for research and analysis of communication patterns.
@@ -44,7 +44,7 @@ Processes the Slack export with a **richer metadata structure**, suitable for re
 
 ---
 
-### 3. `text_mining_topic_modeling_slack.R`
+### 3. `slack_topic_modelling`
 
 **Purpose**:  
 Performs **natural language processing (NLP)** and **topic modeling** on the text extracted from Slack PDFs, enabling insight into the main topics and vocabulary trends.
