@@ -1,4 +1,8 @@
-# Instalando e carregando bibliotecas
+# Script for performing topic modelling on the PDFs produced by the
+# `slack_export` script. It cleans the text, removes stopwords and
+# builds a Structural Topic Model to visualise the main themes.
+
+# Install and load required packages
 install.packages(c("dplyr", "tidytext", "tm", "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2"))
 library(dplyr)
 library(tidytext)
@@ -12,41 +16,42 @@ library(ggplot2)
 install.packages("pdftools")
 library(pdftools)
 
-# Definindo diretório e obtendo lista de arquivos PDF
+# Define the directory where the PDFs are located and list them
 diretorio <- "C:/Users/Usuário/Documents/projeto_pdfs"
-arquivos_pdf <- list.files(diretorio, pattern = ".pdf$", full.names = T)
+arquivos_pdf <- list.files(diretorio, pattern = ".pdf$", full.names = TRUE)
 
-# Extraindo o texto dos PDFs
+# Extract text content from each PDF file
 texto_pdf <- lapply(arquivos_pdf, pdf_text)
 
-#Montando a base de dados
+# Build the base data frame
 
-#Variável 1: id
+# Variable 1: an id for each channel
 num_canais <- length(arquivos_pdf)
-id <- paste0 ("art", 1:num_canais)
+id <- paste0("art", 1:num_canais)
 
-#Variável 2: nomecanal
+# Variable 2: channel name derived from file names
 nomecanal <- tools::file_path_sans_ext(basename(arquivos_pdf))
 
 
-#Juntando em um dataframe
-#Cada item da lista é um var do tipo chr com tamanhos distintos. cbind ou dataframe n funciona
+# Combine everything into a data frame
+# Each list item has a different length, so `cbind` or `data.frame`
+# directly would not work.
 
-#Criando dataframe vazio
+# Create an empty data frame
 dados_canal <- data.frame(id = character(length(texto_pdf)), nomecanal = character(length(texto_pdf)), texto = character(length(texto_pdf)), stringsAsFactors = FALSE)
 
-#Criando um laço para associar cada artigo com sua id e nomecanal
+# Loop over the PDFs assigning id, name and text
 for (i in 1:length(texto_pdf)) {
   dados_canal[i, "id"] <- id[i]
   dados_canal[i, "nomecanal"] <- nomecanal[i]
   dados_canal[i, "texto"] <- paste(texto_pdf[[i]], collapse = " ")
 }
 
-# Carregar o arquivo de stopwords personalizadas
+# Load a file with custom stopwords
 caminho_arquivo <- "C:/Users/Usuário/Desktop/stopwords_personalizadas.txt" 
 stopwords_personalizadas <- readLines(caminho_arquivo)
 
-# Converter para um tibble
+# Convert to a tibble
 stopwords_personalizadas <- tibble(word = stopwords_personalizadas)
 
 stopwords_personalizadas <- stopwords_personalizadas %>%
@@ -55,7 +60,7 @@ stopwords_personalizadas <- stopwords_personalizadas %>%
   mutate(word = gsub("[[:digit:]]", "", word)) %>%
   mutate(word = gsub("[^[:alnum:]\\s]", "", word))
 
-### Tokenização, stopwords e palavras escolhidas como stopwords
+### Tokenisation, removal of stopwords and custom stopwords
 tidy_df <- dados_canal %>%
   unnest_tokens(word, texto) %>%
   anti_join(get_stopwords()) %>%
@@ -63,7 +68,7 @@ tidy_df <- dados_canal %>%
 tidy_df %>%
   count(word, sort = T)
 
-# Limpeza geral
+# General cleaning steps
 tidy_df <- tidy_df %>%
   mutate(word = gsub("[[:punct:]]", "", word)) %>%
   mutate(word = tolower(word)) %>%
@@ -71,18 +76,17 @@ tidy_df <- tidy_df %>%
   mutate(word = gsub("[^[:alnum:]\\s]", "", word)) %>%
   filter(nchar(word) >= 3)
 
-# Reaplicar a remoção de stopwords após as transformações
+# Reapply stopword removal after transformations
 tidy_df <- tidy_df %>%
   anti_join(get_stopwords(), by = "word") %>%
   anti_join(stopwords_personalizadas, by = "word")
 
-# Remoção de pontuações
-# Remoção de maiusculas para evitar duplicações
-# Remover números
-# Remover caracteres especiais
-# Remover palavras pequenas (quando for possível)
+# Remove punctuation
+# Convert to lowercase to avoid duplicates
+# Remove numbers and special characters
+# Drop very short words when possible
 
-# Lematização - redução de palavras a sua forma básica com textstem
+# Lemmatization - reduce words to their base form using textstem
 install.packages("textstem")
 library(textstem)
 tidy_dfl <- tidy_df  %>%
@@ -91,7 +95,7 @@ tidy_dfl <- tidy_df  %>%
 tidy_dfl %>%
   count(word, sort = T)
 
-## Análise descritiva em formato tidytext
+## Basic descriptive analysis using tidytext
 library(dplyr)
 library(tidytext)
 
@@ -102,44 +106,44 @@ contagem_palavras <- df %>%
 
 library(ggplot2)
 
-#wordcloud
+# Plot a simple word frequency bar chart (similar to a word cloud)
 grafico_palavras <- contagem_palavras %>%
   top_n(25) %>%
   ggplot(aes(x = reorder(word, n), y = n)) +
-  geom_bar(stat = "identity", fill = "blue") +  # Mude a cor das barras para azul
+  geom_bar(stat = "identity", fill = "blue") +  # Change bar colour if desired
   labs(x = "Palavras", y = "Contagem") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         axis.text = element_text(size = 12))
 grafico_palavras
 
-# Verificar a coluna de identificação dos textos
+# Check the column containing document identifiers
 df %>% distinct(nomecanal)
 
-## Topic modeling
+## Topic modelling
 library(tm)
 library (tidytext)
 library(tidymodels)
 
-# Criando a matriz
+# Create a sparse matrix with term counts per channel
 spars_tidy_dfl <- tidy_dfl %>%
   count(nomecanal, word) %>%
   cast_sparse(nomecanal, word, n)
 
 spars_tidy_dfl
 
-# Train a model
+# Train the STM model
 library(stm)
-# Para pequenas bases como essa, vamos usar k = 5
+# For small datasets we'll keep k = 5 topics
 topic_model <- stm(spars_tidy_dfl, K = 5)
 
-#Verificando o sumário
+# Inspect the summary
 summary(topic_model)
 
 score_words <- labelTopics(topic_model, n=15, topics = 1:5)
 
 score_words
 
-# Probabilidade de ocorrência por tópico
+# Word probabilities per topic
 install.packages("reshape2")
 library(reshape2)
 install.packages("broom")
@@ -175,7 +179,7 @@ canais_topic %>%
   labs(x = expression(beta), y = NULL)
 
 
-#Agora com as probabilidades ordenadas
+# Plot again with ordered probabilities
 
 canais_topic <- tidy(topic_model, matrix = "beta")
 canais_topic %>%
@@ -189,11 +193,11 @@ canais_topic %>%
   scale_y_reordered()+
   labs(x = expression(beta), y = NULL)
 
-# Probabilidade por documento
+# Document-topic probabilities
 doc_topic <- tidy(topic_model, matrix = "gamma",document_names = rownames(spars_tidy_dfl))
 print(doc_topic, n = 215)
 
-# Identificando um tópico para cada documento
+# Identify one topic for each document
 doc_gg <- doc_topic %>%
   mutate(document = forcats::fct_reorder(document, gamma), topic = factor(topic)) %>%
   ggplot(aes(gamma, topic, fill = topic))+
@@ -204,28 +208,28 @@ doc_gg <- doc_topic %>%
 
 ggsave("C:/Users/Usuário/Desktop/gamma_tinst_p.png", doc_gg, width = 11, height = 8.5, dpi = 300)
 
-# Visualizar em tabela ao invés do gráfico
+# View in table form instead of a plot
 doc_topic_t <- doc_topic %>%
   pivot_wider(names_from = topic, values_from = gamma, values_fill = 0)
 doc_topic_t
 
 
-#outros gráficos
+# Other visualisations
 
-# Visualizar as 10 palavras mais frequentes
+# Show the 10 most frequent words
 contagem_palavras <- tidy_dfl %>%
   count(word, sort = TRUE)
 
 head(contagem_palavras, 10)
 
-#Gráfico: Um gráfico de barras das palavras mais frequentes.
+# Bar plot of the most frequent words
 ggplot(contagem_palavras %>% top_n(25), aes(x = reorder(word, n), y = n)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
   labs(x = "Palavras", y = "Frequência") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-#Nuvem de Palavras
+# Word cloud of the terms
 install.packages("wordcloud")
 library(wordcloud)
 library(RColorBrewer)

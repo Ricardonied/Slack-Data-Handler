@@ -1,14 +1,19 @@
-#instalar pacotes necessários para o procedimento de exportação do histórico de conversas do slack
-install.packages("rjson")
-library(rjson) #import and manipulate JSON files
-install.packages("dplyr")
-library(dplyr) #data handling / pipe char
+# Script that produces a detailed CSV of Slack messages with
+# additional metadata (threads, reactions, etc.) and exports
+# users and channels information. Useful for research purposes.
 
-#Descompacte o arquivo de exportação do Slack
-#Colocar a pasta descompactada exportada no slack no diretório do R C:\Users\Usuário\Documents
-#getwd() <- "C:/Users/Usuário/Documents"
-# Copiar o nome da pasta descompactada ou passá-lo via argumento
-# Se nada for especificado, usa-se um placeholder padrao.
+# Install the packages required to read the Slack export. Uncomment
+# the following lines if running for the first time.
+install.packages("rjson")
+library(rjson) # import and manipulate JSON files
+install.packages("dplyr")
+library(dplyr) # data handling / pipe operator
+
+# Unzip your Slack export and place the extracted folder somewhere on
+# your machine (e.g. `C:/Users/User/Documents`). Use `getwd()` if you
+# need to set the working directory.
+# Provide the folder name via argument or a default will be used when
+# running non-interactively.
 args <- commandArgs(trailingOnly = TRUE)
 if (interactive()) {
   export_name <- if (length(args) >= 1) args[1] else readline("Enter Slack export folder name: ")
@@ -18,16 +23,16 @@ if (interactive()) {
 working_directory <- getwd() %>% as.character()
 slackexport_folder_path <- paste0(working_directory, "/", export_name)
 
-#Faça uma lista de todos os canais presentes no slack export
-#Essas informações estão todas no arquivo "<path>/export_name/channels.json".
+# Build a table of all channels in the export. These details are
+# available in `<export_name>/channels.json`.
 channels_path <- paste0(slackexport_folder_path,"/channels.json")
 channels_json <- fromJSON(file = channels_path)
 channel_list <- setNames(data.frame(matrix(ncol = 9, nrow = 0)), 
                          c("ch_id", "name", "created", "creator", "is_archived",
                            "is_general", "members", "topic", "purpose"))
 
-for (channel in 1:length(channels_json)) { 
-  #Make a df (channel_list) with information about each channel, from the JSON file
+for (channel in 1:length(channels_json)) {
+  # Populate `channel_list` with information about each channel from the JSON file
   channel_list[channel, "ch_id"] <- channels_json[[channel]]$id
   channel_list[channel, "name"] <- channels_json[[channel]]$name
   channel_list[channel, "created"] <- channels_json[[channel]]$created
@@ -35,11 +40,11 @@ for (channel in 1:length(channels_json)) {
   channel_list[channel, "is_archived"] <- channels_json[[channel]]$is_archived
   channel_list[channel, "is_general"] <- channels_json[[channel]]$is_general
   
-  #make a comma separated list of members
+  # Build a comma-separated list of member IDs
   memberlist <- ""
-  if (length(channels_json[[channel]]$members) > 0) { # Verifica se a lista de membros não está vazia
+  if (length(channels_json[[channel]]$members) > 0) { # check that the member list is not empty
     for (member in 1:length(channels_json[[channel]]$members)) {
-      #if it isn't the last member
+      # If it isn't the last member
       if (member < length(channels_json[[channel]]$members)) {
         memberlist <- paste0(memberlist, channels_json[[channel]]$members[[member]], ", ")
       }
@@ -52,8 +57,8 @@ for (channel in 1:length(channels_json)) {
   channel_list[channel, "topic"] <- channels_json[[channel]]$topic$value
   channel_list[channel, "purpose"] <- channels_json[[channel]]$purpose$value
   
-  #For each channel make a list of all the individual JSON files (one file per day of activity)
-  #Add that list to the channels_json object as a list in each channel: channels_json[[channel]]$dayslist
+  # For each channel list all JSON files (one per day) and store the
+  # list into `channels_json[[channel]]$dayslist`
   channel_folder_path <- ""
   channels_json[[channel]]$dayslist <- ""
   channel_folder_path <- paste0(slackexport_folder_path,"/",channel_list[channel,"name"])
@@ -61,9 +66,10 @@ for (channel in 1:length(channels_json)) {
                                                   pattern=NULL, all.files=FALSE, full.names=FALSE)
 }
 
-# Função para converter um único arquivo JSON em um dataframe com campos específicos extraídos
+# Helper to transform a single JSON file into a data frame with the
+# desired message metadata
 slack_json_to_dataframe <- function(slack_json) {
-  # Inicializa o dataframe com as colunas esperadas
+  # Start the data frame with the expected columns
   messages_df <- setNames(data.frame(matrix(ncol = 10, nrow = 0)), 
                           c("msg_id", "ts", "user", "type", "text", "reply_count",
                             "reply_users_count", "ts_latest_reply", "ts_thread", 
@@ -71,7 +77,7 @@ slack_json_to_dataframe <- function(slack_json) {
   
   # Itera sobre cada mensagem no arquivo JSON
   for (message in 1:length(slack_json)) {
-    # Atribui os valores, substituindo `NULL` por `NA` para evitar erros
+    # Extract fields while replacing NULL with NA
     msg_id <- if (!is.null(slack_json[[message]]$client_msg_id)) slack_json[[message]]$client_msg_id else NA
     ts <- if (!is.null(slack_json[[message]]$ts)) slack_json[[message]]$ts else NA
     user <- if (!is.null(slack_json[[message]]$user)) slack_json[[message]]$user else NA
@@ -83,7 +89,7 @@ slack_json_to_dataframe <- function(slack_json) {
     ts_thread <- if (!is.null(slack_json[[message]]$thread_ts)) slack_json[[message]]$thread_ts else NA
     parent_user_id <- if (!is.null(slack_json[[message]]$parent_user_id)) slack_json[[message]]$parent_user_id else NA
     
-    # Adiciona a mensagem ao dataframe
+    # Append the message record to the data frame
     messages_df <- rbind(messages_df, data.frame(
       msg_id = msg_id, 
       ts = ts, 
@@ -111,45 +117,45 @@ all_channels_all_files_df <- setNames(data.frame(matrix(ncol = 11, nrow = 0)),
 
 # Loop para processar cada canal
 for (channel in 1:length(channels_json)) {
-  # Inicializa o dataframe para todas as mensagens em um único canal
+  # Create a data frame to hold all messages for a single channel
   all_channel_files_df <- setNames(data.frame(matrix(ncol = 10, nrow = 0)), 
                                    c("msg_id", "ts", "user", "type", "text",
                                      "reply_count", "reply_users_count", 
                                      "ts_latest_reply", "ts_thread", "parent_user_id"))
   
-  # Verifica se a lista 'dayslist' não está vazia
+  # Check if the list of daily files is not empty
   if (length(channels_json[[channel]]$dayslist) > 0) {
     for (file_day in 1:length(channels_json[[channel]]$dayslist)) {
-      # Importa o arquivo JSON para um dia específico
+      # Load the JSON file for a specific day
       parentfolder_path <- paste0(slackexport_folder_path,"/",channels_json[[channel]]$name)
       filejson_path <- paste0(parentfolder_path, "/", channels_json[[channel]]$dayslist[[file_day]])
       import_file_json <- fromJSON(file = filejson_path)
       
-      # Converte o arquivo JSON para um dataframe usando a função `slack_json_to_dataframe`
+      # Convert the JSON file to a data frame using `slack_json_to_dataframe`
       import_file_df <- slack_json_to_dataframe(import_file_json)
       
-      # Adiciona os dados do dia ao dataframe de todas as mensagens do canal
+      # Append the day's messages to the channel data frame
       all_channel_files_df <- rbind(all_channel_files_df, import_file_df)
     }
     
-    # Adiciona o nome do canal ao dataframe
+    # Add the channel name to the data frame
     all_channel_files_df$channel <- channels_json[[channel]]$name
     
-    # Adiciona os dados do canal ao dataframe final com todas as mensagens de todos os canais
+    # Append the channel data to the master data frame with all channels
     all_channels_all_files_df <- rbind(all_channels_all_files_df, all_channel_files_df)
   } else {
-    # Se a lista 'dayslist' estiver vazia, emite um aviso (opcional)
-    warning(paste("O canal", channels_json[[channel]]$name, "não tem arquivos JSON associados."))
+    # Warn if the channel had no associated JSON files
+    warning(paste("Channel", channels_json[[channel]]$name, "has no JSON files."))
   }
 }
 
 
 
-#write the all files to a CSV in your R working directory
-#format: exportfoldername_mindate_to_maxdate.csv
+# Write all messages to a CSV in the working directory.
+# File name uses the earliest and latest timestamps found.
 filename_mindate <- min(all_channels_all_files_df$ts) %>% as.numeric() %>% as.Date.POSIXct()
 filename_maxdate <- max(all_channels_all_files_df$ts) %>% as.numeric() %>% as.Date.POSIXct()
-#Note exportfoldername was defined earlier before pulling in any of the files: export_name
+# `export_name` was defined earlier before reading any files
 slack_export_df_filename <- paste0(export_name,"_",filename_mindate,"_to_",filename_maxdate,".csv")
 write.csv(all_channels_all_files_df, file = slack_export_df_filename)
 
@@ -157,18 +163,18 @@ write.csv(all_channels_all_files_df, file = slack_export_df_filename)
 #TODO - make a users table with user metadata, write to csv
 users_path <- paste0(slackexport_folder_path,"/users.json")
 users_json <- fromJSON(file = users_path)
-#initialize empty user df
+# Initialize empty user data frame
 user_list_df <- setNames(data.frame(matrix(ncol = 11, nrow = 0)), 
                          c("user_id", "team_id", "name", "deleted", "real_name",
                            "tz", "tz_label", "tz_offset", "title", "display_name", 
                            "is_bot"))
-#fill it with the appropriate fields from JSON
+# Fill it with fields from the `users.json` file
 for (user in 1:length(users_json)) {
   user_list_df[user, "user_id"] <- users_json[[user]]$id
   user_list_df[user, "team_id"] <- users_json[[user]]$team_id
   user_list_df[user, "name"] <- users_json[[user]]$name
   user_list_df[user, "deleted"] <- users_json[[user]]$deleted
-  #real_name is in a different place for bots - its nested in $profile
+  # real_name is located under $profile for bots
   if (is.null(users_json[[user]]$real_name) == FALSE) {
     user_list_df[user, "real_name"] <- users_json[[user]]$real_name
   }
@@ -178,7 +184,7 @@ for (user in 1:length(users_json)) {
   user_list_df[user, "title"] <- users_json[[user]]$profile$title
   user_list_df[user, "display_name"] <- users_json[[user]]$profile$display_name
   user_list_df[user, "is_bot"] <- users_json[[user]]$is_bot
-  #bots (?not sure who else) don't have time zone information. catch that null
+  # Bots (and maybe others) might not have time zone information
   if (is.null(users_json[[user]]$tz) == FALSE) {
     user_list_df[user, "tz"] <- users_json[[user]]$tz
     user_list_df[user, "tz_label"] <- users_json[[user]]$tz_label
@@ -191,8 +197,7 @@ slack_export_user_filename <- paste0(export_name,"_users.csv")
 write.csv(user_list_df, file = slack_export_user_filename)
 
 
-#Write a csv for channel metadata
-#write user data to a csv to be read back in as df, as needed.
+# Finally, write out the channel metadata as a separate CSV
 slack_export_channel_filename <- paste0(export_name,"_channels.csv")
 write.csv(channel_list, file = slack_export_channel_filename)
 
