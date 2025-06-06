@@ -83,3 +83,6 @@ install.packages(c(
   "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
   "textstem", "wordcloud"
 ))
+```
+
+Install them once with the command above before running the scripts.
