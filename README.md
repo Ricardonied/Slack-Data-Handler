@@ -83,3 +83,8 @@ install.packages(c(
   "tidymodels", "stm", "reshape2", "forcats", "knitr", "ggplot2",
   "textstem", "wordcloud"
 ))
+
+```
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
