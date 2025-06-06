@@ -9,6 +9,8 @@ library(reshape2)
 library(forcats)
 library(knitr)
 library(ggplot2)
+install.packages("pdftools")
+library(pdftools)
 
 # Definindo diretório e obtendo lista de arquivos PDF
 diretorio <- "C:/Users/Usuário/Documents/projeto_pdfs"
@@ -226,6 +228,7 @@ ggplot(contagem_palavras %>% top_n(25), aes(x = reorder(word, n), y = n)) +
 #Nuvem de Palavras
 install.packages("wordcloud")
 library(wordcloud)
-wordcloud(words = contagem_palavras$word, freq = contagem_palavras$n, min.freq = 2, 
+library(RColorBrewer)
+wordcloud(words = contagem_palavras$word, freq = contagem_palavras$n, min.freq = 2,
           random.order = FALSE, colors = brewer.pal(8, "Dark2"))
 
